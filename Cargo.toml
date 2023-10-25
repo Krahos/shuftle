@@ -1,0 +1,11 @@
+[workspace]
+
+members = [
+  "shuftlib",
+  "client-sdk",
+  "shuftle-client",
+  "application-server",
+  "game-server",
+]
+
+resolver = "2"
