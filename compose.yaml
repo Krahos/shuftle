@@ -26,9 +26,9 @@ services:
         - "${ENV_KEYCLOAK_PUBLIC_PORT:-8080}:8080"
       command: ['start', '--optimized']
       depends_on:
-        - postgres
+        - keycloak-postgres
 
-  postgres:
+  keycloak-postgres:
       build:
         context: ./.docker/images/postgres
       restart: unless-stopped
