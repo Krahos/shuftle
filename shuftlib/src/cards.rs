@@ -32,6 +32,7 @@ impl ItalianCard {
 
 impl Card for ItalianCard {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 /// Representation of a card that goes into an French deck.
 pub struct FrenchCard {
     rank: FrenchRank,
@@ -58,11 +59,13 @@ impl FrenchCard {
 impl Card for FrenchCard {}
 
 /// A Joker card, present in some card games. Its function depends on the game.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Joker;
 
 impl Card for Joker {}
 
 /// A variant of the French card, which can either be an actual French card or a joker.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FrenchWithJoker {
     /// A standard French card.
     Normal(FrenchCard),
