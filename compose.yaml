@@ -33,14 +33,15 @@ services:
       env_file: .env
       build:
         context: ./.docker/images/postgres
+      user: '${UID:-1000}:${GID:-1000}'
       restart: unless-stopped
       volumes:
         - ./.postgres/data:/var/lib/postgresql/data:delegated
-      user: '${ENV_USER_ID:-1000}:${ENV_USER_GROUP:-1000}'
       environment:
         POSTGRES_DB: ${ENV_KEYCLOAK_DB_DATABASE:-keycloak}
         POSTGRES_USER: ${ENV_KEYCLOAK_DB_USER:-keycloak}
         POSTGRES_PASSWORD: ${ENV_KEYCLOAK_DB_PASSWORD:-password}
+        # PGDATA: /var/lib/postgresql/data/pgdata
       healthcheck:
         test:
           [
@@ -55,3 +56,14 @@ services:
         interval: 1m
         timeout: 10s
         retries: 3
+      depends_on:
+        - postgres-setup
+
+  postgres-setup:
+      build:
+        context: ./.docker/images/postgres
+      user: root
+      volumes:
+        - ./.postgres/data:/var/lib/postgresql/data
+        - ./.postgres/config:/etc/postgresql
+      entrypoint: [ "bash", "-c", "chmod 750 -R /var/lib/postgresql/data && chmod 750 -R /etc/postgresql && chown -R ${UID:-1000}:${GID:-1000} /var/lib/postgresql/data"] 
