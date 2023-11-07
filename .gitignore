@@ -1,4 +1,17 @@
+/.postgres/*
+!/.postgres/.gitkeep
+
+# Rust
 /target
+Cargo.lock
+
+# IDEs
 .vscode
 .idea
-Cargo.lock
+
+.env
+
+**/*.rs.bk
+/*.data
+/*.gz
+*.local
