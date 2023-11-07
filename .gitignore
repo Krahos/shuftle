@@ -1,5 +1,7 @@
-/.postgres/*
-!/.postgres/.gitkeep
+/.postgres/keycloak/*
+!/.postgres/keycloak/.gitkeep
+/.postgres/game/*
+!/.postgres/game/.gitkeep
 
 # Rust
 /target
