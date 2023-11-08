@@ -1,7 +1,7 @@
 ARG KEYCLOAK_VERSION
-
 FROM quay.io/keycloak/keycloak:$KEYCLOAK_VERSION as builder
 
+ARG KEYCLOAK_VENDOR
 ENV KC_DB=$KEYCLOAK_VENDOR
 
 ENV KC_FEATURES="token-exchange,scripts,preview"
@@ -12,8 +12,10 @@ WORKDIR /opt/keycloak
 # RUN /opt/keycloak/bin/kc.sh build --cache=ispn --cache-stack=kubernetes --health-enabled=true --metrics-enabled=true
 RUN /opt/keycloak/bin/kc.sh build --cache=ispn --health-enabled=true --metrics-enabled=true
 
+ARG KEYCLOAK_VERSION
 FROM quay.io/keycloak/keycloak:$KEYCLOAK_VERSION
 
+ARG KEYCLOAK_VERSION
 LABEL image.version=$KEYCLOAK_VERSION
 
 COPY --from=builder /opt/keycloak/ /opt/keycloak/
