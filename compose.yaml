@@ -1,0 +1,78 @@
+version: '3.9'
+
+services:
+  keycloak:
+    env_file: .env
+    build:
+      context: ./.docker/images/keycloak
+      args:
+        KEYCLOAK_VERSION: 22.0.5
+        KEYCLOAK_VENDOR: postgres
+    restart: unless-stopped
+    environment:
+      JAVA_OPTS_APPEND: -Dkeycloak.profile.feature.upload_scripts=enabled
+      KC_DB: postgres
+      KC_DB_URL_HOST: ${ENV_KEYCLOAK_DB_HOST:-keycloak-postgres}
+      KC_DB_URL_PORT: ${ENV_KEYCLOAK_DB_PORT:-5432}
+      KC_DB_URL_DATABASE: ${ENV_KEYCLOAK_DB_DATABASE:-keycloak}
+      KC_DB_USERNAME: ${ENV_KEYCLOAK_DB_USER:-keycloak}
+      KC_DB_PASSWORD: ${ENV_KEYCLOAK_DB_PASSWORD:-password}
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_METRICS_ENABLED: "true"
+      KC_HOSTNAME_URL: "${ENV_KEYCLOAK_URL:-http://localhost:8080}"
+      KC_PROXY: reencrypt
+      KEYCLOAK_ADMIN: ${ENV_KEYCLOAK_USER:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${ENV_KEYCLOAK_PASSWORD:-passwd}
+    ports:
+      - "${ENV_KEYCLOAK_PUBLIC_PORT:-8080}:8080"
+    command: ['start', '--optimized']
+    depends_on:
+      keycloak-postgres:
+          condition: service_started
+
+  keycloak-postgres:
+    env_file: .env
+    build:
+      context: ./.docker/images/postgres
+    user: '${UID:-1000}:${GID:-1000}'
+    restart: unless-stopped
+    volumes:
+      - ./.postgres/keycloak/data:/var/lib/postgresql/data:delegated
+    environment:
+      # POSTGRES_HOST: ${ENV_KEYCLOAK_DB_HOST:-keycloak-postgres}
+      POSTGRES_DB: ${ENV_KEYCLOAK_DB_DATABASE:-keycloak}
+      POSTGRES_USER: ${ENV_KEYCLOAK_DB_USER:-keycloak}
+      POSTGRES_PASSWORD: ${ENV_KEYCLOAK_DB_PASSWORD:-password}
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'psql',
+          '-w',
+          '-U',
+          'postgres',
+          '-c',
+          'SELECT 1'
+        ]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    depends_on:
+      - keycloak-postgres-setup
+
+  postgres-setup:
+    build:
+      context: ./.docker/images/postgres
+    user: root
+    volumes:
+      - ./.postgres/game/data:/var/lib/postgresql/data
+    entrypoint: [ "bash", "-c", "chmod 750 -R /var/lib/postgresql/data && chmod 750 -R /etc/postgresql && chown -R ${UID:-1000}:${GID:-1000} /var/lib/postgresql/data"]
+
+  keycloak-postgres-setup:
+    build:
+      context: ./.docker/images/postgres
+    user: root
+    volumes:
+      - ./.postgres/keycloak/data:/var/lib/postgresql/data
+    entrypoint: [ "bash", "-c", "chmod 750 -R /var/lib/postgresql/data && chmod 750 -R /etc/postgresql && chown -R ${UID:-1000}:${GID:-1000} /var/lib/postgresql/data"]
