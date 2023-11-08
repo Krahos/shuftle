@@ -60,10 +60,24 @@ To run the project, follow these steps:
 cd shuftle
 ```
 
-3. Start the Docker containers using Docker Compose:
+3. Copy the `.env.dist` as your local `.env` file:
 
 ```bash
-docker-compose up -d
+cp .env.dist .env
+```
+
+4. Build the images:
+
+```bash
+docker compose build --no-cache
+```
+
+NB: This also let build Keycloak within the proper Database vendor.
+
+5. Start the Docker containers using Docker Compose:
+
+```bash
+docker compose up -d
 ```
 
 This command will start all the project's containers, including Keycloak and the PostgreSQL database.
