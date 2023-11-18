@@ -30,6 +30,7 @@ impl ItalianCard {
     }
 }
 
+
 impl Card for ItalianCard {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,7 +159,21 @@ where
 const FRENCH_CARDS: usize = 52;
 const ITALIAN_CARDS: usize = 40;
 
-impl<T: Card> Deck<T> {
+impl Deck<ItalianCard> {
+    /// Creates a new deck in the Italian format.
+    pub fn italian() -> Deck<ItalianCard> {
+        let mut cards = Vec::with_capacity(ITALIAN_CARDS);
+        for suit in Suit::iter() {
+            for rank in ItalianRank::iter() {
+                cards.push(ItalianCard { rank, suit });
+            }
+        }
+
+        Deck { cards }
+    }
+}
+
+impl Deck<FrenchCard> {
     /// Creates a new 52 cards French deck.
     pub fn french() -> Deck<FrenchCard> {
         let mut cards = Vec::with_capacity(FRENCH_CARDS);
@@ -186,18 +201,9 @@ impl<T: Card> Deck<T> {
 
         Deck { cards }
     }
+}
 
-    /// Creates a new deck in the Italian format.
-    pub fn italian() -> Deck<ItalianCard> {
-        let mut cards = Vec::with_capacity(ITALIAN_CARDS);
-        for suit in Suit::iter() {
-            for rank in ItalianRank::iter() {
-                cards.push(ItalianCard { rank, suit });
-            }
-        }
-
-        Deck { cards }
-    }
+impl<T: Card> Deck<T> {
 
     /// Performs a random permutation on the deck with the Fisher–Yates shuffle algorithm, repeated 10 times.
     pub fn shuffle(&mut self) {
@@ -274,5 +280,25 @@ where
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.cards
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::cards::{Deck};
+
+    #[test]
+    fn should_shuffle() {
+        let sorted_deck = Deck::italian();
+
+        let mut shuffled_deck = Deck::italian();
+        shuffled_deck.shuffle();
+
+        let decks = sorted_deck.cards.iter().zip(shuffled_deck.cards.iter());
+
+        let count_of_different_cards = decks.filter( |(&card1, &card2)| card1 != card2 ).count();
+
+        assert_ne!(count_of_different_cards, 0);
+
     }
 }
