@@ -30,6 +30,15 @@ impl ItalianCard {
     }
 }
 
+impl Default for ItalianCard {
+    fn default() -> Self {
+        ItalianCard {
+            rank: ItalianRank::Ace,
+            suit: Suit::Clubs,
+        }
+    }
+}
+
 impl Card for ItalianCard {}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
