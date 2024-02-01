@@ -66,4 +66,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run cargo install cargo-udeps
       - name: Check for unused dependencies
-      - run: cargo +nightly udeps
+        run: cargo +nightly udeps
