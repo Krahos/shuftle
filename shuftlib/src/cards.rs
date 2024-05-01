@@ -1,13 +1,16 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    fmt::Display,
+    ops::{Deref, DerefMut},
+};
 
 use rand::Rng;
-use strum::{EnumCount, EnumIter, IntoEnumIterator};
+use strum::{EnumIter, FromRepr, IntoEnumIterator};
 
 /// A trait representing a card. The actual implementation depends on the game where this is used.
 pub trait Card {}
 
 /// Representation of a card that goes into an Italian deck.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ItalianCard {
     rank: ItalianRank,
     suit: Suit,
@@ -36,6 +39,12 @@ impl Default for ItalianCard {
             rank: ItalianRank::Ace,
             suit: Suit::Clubs,
         }
+    }
+}
+
+impl Display for ItalianCard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.rank as u8, self.suit)
     }
 }
 
@@ -83,12 +92,13 @@ pub enum FrenchWithJoker {
 }
 impl Card for FrenchWithJoker {}
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, EnumCount)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, FromRepr, Hash)]
+#[repr(u8)]
 /// The rank of the card. In an Italian deck, ranks go from the ace to the 7, then they also have a jack, knight and king,
 /// In most games they each have a different value that depends on the game itself.
 pub enum ItalianRank {
     /// 1
-    Ace,
+    Ace = 1,
     /// 2
     Two,
     /// 3
@@ -109,12 +119,13 @@ pub enum ItalianRank {
     King,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, EnumCount)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, FromRepr, Hash)]
+#[repr(u8)]
 /// The rank of the card. In a French deck, ranks go from the ace to 10, then there is a jack, queen and king,
 /// In most games they each have a different value that depends on the game itself.
 pub enum FrenchRank {
     /// 1
-    Ace,
+    Ace = 1,
     /// 2
     Two,
     /// 3
@@ -141,7 +152,7 @@ pub enum FrenchRank {
     King,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, EnumIter, Hash)]
 /// The 4 suits of a standard deck. They have an equivalent in pretty much all regional decks.
 /// In some games they have a hierarchical order.
 pub enum Suit {
@@ -153,6 +164,18 @@ pub enum Suit {
     Clubs,
     /// Spades or Pikes (French), Leaves (German), Swords (Latin).
     Spades,
+}
+
+impl Display for Suit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Suit::Hearts => "H",
+            Suit::Diamonds => "D",
+            Suit::Clubs => "C",
+            Suit::Spades => "S",
+        };
+        write!(f, "{}", s)
+    }
 }
 
 #[derive(Default)]

@@ -3,24 +3,25 @@
 
   inputs = {
     nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
+    flake-utils.url = "github:numtide/flake-utils";
   };
-
-  outputs = { self, nixpkgs }:
-    let
-      system = "x86_64-linux";
-      pkgs = nixpkgs.legacyPackages.${system};
-    in
-   {
-    devShells.${system}.default = pkgs.mkShell {
-      shellHook = "echo Ready to develop Shuftle!";
-      packages = [
-        pkgs.cargo
-        pkgs.rustc
-        pkgs.rust-analyzer
-        pkgs.cargo-watch
-        pkgs.clippy
-        pkgs.rustfmt
-      ];
-    };
-  };
+  outputs = { self, nixpkgs, flake-utils }:
+    flake-utils.lib.eachDefaultSystem(
+      system:
+        let
+          pkgs = nixpkgs.legacyPackages.${system};
+        in
+      {
+        devShells.default = pkgs.mkShell {
+          packages = [
+            pkgs.cargo
+            pkgs.rust-analyzer
+            pkgs.clippy
+            pkgs.cargo-watch
+            pkgs.rustfmt
+            pkgs.cargo-sort
+          ];
+        };
+      }
+    );
 }

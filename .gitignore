@@ -12,6 +12,7 @@ Cargo.lock
 .idea
 
 .env
+/.direnv
 
 **/*.rs.bk
 /*.data
