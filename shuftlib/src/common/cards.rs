@@ -7,7 +7,7 @@ use rand::Rng;
 use strum::{EnumIter, FromRepr, IntoEnumIterator};
 
 /// A trait representing a card. The actual implementation depends on the game where this is used.
-pub trait Card {}
+pub trait Card: Display + Default + Sized {}
 
 /// Representation of a card that goes into an Italian deck.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -74,6 +74,21 @@ impl FrenchCard {
     }
 }
 
+impl Default for FrenchCard {
+    fn default() -> Self {
+        FrenchCard {
+            rank: FrenchRank::Ace,
+            suit: Suit::Hearts,
+        }
+    }
+}
+
+impl Display for FrenchCard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}", self.rank as u8, self.suit)
+    }
+}
+
 impl Card for FrenchCard {}
 
 /// A Joker card, present in some card games. Its function depends on the game.
@@ -81,6 +96,18 @@ impl Card for FrenchCard {}
 pub struct Joker;
 
 impl Card for Joker {}
+
+impl Default for Joker {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+impl Display for Joker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "JK")
+    }
+}
 
 /// A variant of the French card, which can either be an actual French card or a joker.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +118,24 @@ pub enum FrenchWithJoker {
     Joker(Joker),
 }
 impl Card for FrenchWithJoker {}
+
+impl Default for FrenchWithJoker {
+    fn default() -> Self {
+        Self::Normal(FrenchCard {
+            rank: FrenchRank::Ace,
+            suit: Suit::Hearts,
+        })
+    }
+}
+
+impl Display for FrenchWithJoker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FrenchWithJoker::Normal(c) => write!(f, "{}", c),
+            FrenchWithJoker::Joker(c) => write!(f, "{}", c),
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, EnumIter, FromRepr, Hash)]
 #[repr(u8)]
@@ -315,7 +360,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::cards::Deck;
+    use crate::common::cards::Deck;
 
     #[test]
     fn should_shuffle() {

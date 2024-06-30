@@ -1,25 +1,28 @@
 {
-  description = "A very basic flake";
+  description = "Rust devshell for Shuftle";
 
   inputs = {
-    nixpkgs.url = "github:nixos/nixpkgs?ref=nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url      = "github:NixOS/nixpkgs/nixos-unstable";
+    rust-overlay.url = "github:oxalica/rust-overlay";
+    flake-utils.url  = "github:numtide/flake-utils";
   };
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem(
-      system:
-        let
-          pkgs = nixpkgs.legacyPackages.${system};
-        in
+
+  outputs = { nixpkgs, rust-overlay, flake-utils, ... }:
+    flake-utils.lib.eachDefaultSystem (system:
+      let
+        overlays = [ (import rust-overlay) ];
+        pkgs = import nixpkgs {
+          inherit system overlays;
+        };
+      in
+      with pkgs;
       {
-        devShells.default = pkgs.mkShell {
-          packages = [
-            pkgs.cargo
-            pkgs.rust-analyzer
-            pkgs.clippy
-            pkgs.cargo-watch
-            pkgs.rustfmt
-            pkgs.cargo-sort
+        devShells.default = mkShell {
+          buildInputs = [
+            cargo-watch
+            cargo-udeps
+            rust-analyzer
+            rust-bin.nightly.latest.default
           ];
         };
       }
