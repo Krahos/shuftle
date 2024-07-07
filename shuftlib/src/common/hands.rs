@@ -7,10 +7,9 @@ use super::cards::Card;
 /// Many of the types contained in  this module are generic over certain
 /// constants related to the game. This trait is the summary of these
 /// constraints.
-pub trait TrickTakingGame: Copy {
-    /// Define the type of card that's going to be used in this game. The card
-    /// should implement the `Card` and `Copy` trait.
-    type CardType: Card + Copy;
+pub trait TrickTakingGame: Iterator {
+    /// Define the type of card that's going to be used in this game.
+    type CardType: Card;
     /// Every game has a fixed number of players defined by the rules of the
     /// game or, anyway, before starting it.
     const PLAYERS: usize;
@@ -187,7 +186,7 @@ impl<const PLAYERS: usize> Deref for PlayerId<PLAYERS> {
 
 /// A trick is a set containing the cards played and the player who won the
 /// trick, represented as `PlayerId`.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub struct Trick<G>
 where
     G: TrickTakingGame,
@@ -229,7 +228,7 @@ where
 
 /// A temporary state of a trick that's still not over: not all the players made
 /// their move or a taker hasn't been determined yet.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug)]
 pub struct OngoingTrick<G>
 where
     G: TrickTakingGame,
@@ -237,6 +236,24 @@ where
 {
     cards: [Option<G::CardType>; G::PLAYERS],
     first_to_play: PlayerId<{ G::PLAYERS }>,
+    next_to_play: PlayerId<{ G::PLAYERS }>,
+    play_count: usize,
+}
+
+impl<G> Iterator for OngoingTrick<G>
+where
+    G: TrickTakingGame,
+    [(); G::PLAYERS]:,
+{
+    type Item = PlayerId<{ G::PLAYERS }>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.play_count == G::PLAYERS - 1 {
+            None
+        } else {
+            Some(self.next_to_play)
+        }
+    }
 }
 
 impl<G> Deref for OngoingTrick<G>
@@ -269,12 +286,13 @@ where
     /// let first_to_play = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
     /// let card = TressetteCard::new(ItalianRank::Ace, Suit::Hearts);
     /// let mut trick = OngoingTrick::<TressetteGame>::new(first_to_play);
-    /// trick.play(card, first_to_play);
+    /// trick.play(card);
     ///
     /// assert_eq!(trick[0], Some(card));
     /// ```
-    pub fn play(&mut self, card: G::CardType, player: PlayerId<{ G::PLAYERS }>) {
-        self.cards[player.0] = Some(card);
+    pub fn play(&mut self, card: G::CardType) {
+        self.cards[self.next_to_play.0] = Some(card);
+        self.next_to_play.inc();
     }
 
     /// Tries to transform the current `OngoingTrick` into a `Trick` by
@@ -303,15 +321,15 @@ where
     /// ];
     /// let first_to_play = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
     /// let mut ongoing_trick = OngoingTrick::<TressetteGame>::new(first_to_play);
-    /// ongoing_trick.play(cards[0], first_to_play);
+    /// ongoing_trick.play(cards[0]);
     ///
     /// // After only playing a card, it's not possible to finish the OngoingTrick.
-    /// assert_eq!(None, ongoing_trick.finish());
+    /// assert!(ongoing_trick.clone().finish().is_none());
     ///
     /// let mut to_play = first_to_play;
     /// to_play.inc();
     /// cards.iter().skip(1).for_each(|&c| {
-    ///   ongoing_trick.play(c, to_play);
+    ///   ongoing_trick.play(c);
     ///   to_play.inc();
     /// });
     ///
@@ -340,7 +358,7 @@ where
         }
 
         let taker = G::determine_taker(&cards, self.first_to_play);
-        return Some(Trick { cards, taker });
+        Some(Trick { cards, taker })
     }
 
     /// Getter for the cards contained in this `OngoingTrick`.
@@ -348,9 +366,14 @@ where
         &self.cards
     }
 
-    /// Getter for the `PlayerId` of the person who starts the trick.
+    /// Getter for the id of the person who starts the trick.
     pub fn first_to_play(&self) -> usize {
         self.first_to_play.0
+    }
+
+    /// Getter for the id of the person who playes last in the trick.
+    pub fn next_to_play(&self) -> usize {
+        self.next_to_play.0
     }
 
     /// Creates a new `OngoingTrick`, by defining the logic to determine the
@@ -369,9 +392,15 @@ where
     /// ongoing_trick.cards().iter().for_each(|&c| assert!(c.is_none()));
     /// ```
     pub fn new(first_to_play: PlayerId<{ G::PLAYERS }>) -> Self {
+        let mut last_to_play = first_to_play;
+        (0..G::PLAYERS - 1)
+            .into_iter()
+            .for_each(|_| last_to_play.inc());
         Self {
             cards: [None; G::PLAYERS],
             first_to_play,
+            next_to_play: first_to_play,
+            play_count: 0,
         }
     }
 }
@@ -381,6 +410,7 @@ where
 /// tressette and our team won in just 2 hands!". This type is generic over the
 /// actual card type, the number of players allowed and the number of tricks it
 /// takes to finish the hand.
+#[derive(Debug, Clone, Copy)]
 pub struct Hand<G>
 where
     G: TrickTakingGame,
@@ -390,8 +420,21 @@ where
     tricks: [Trick<G>; G::TRICKS],
 }
 
+impl<G> Hand<G>
+where
+    G: TrickTakingGame,
+    [(); G::PLAYERS]:,
+    [(); G::TRICKS]:,
+{
+    /// Returns a reference to the tricks of this [`Hand<G>`].
+    pub fn tricks(&self) -> &[Trick<G>; G::TRICKS] {
+        &self.tricks
+    }
+}
+
 /// A hand takes multiple turns for each player to be completed, this is the
 /// representation of a `Hand` which hasn't been completed yet.
+#[derive(Clone, Copy, Debug)]
 pub struct OngoingHand<G>
 where
     G: TrickTakingGame,
@@ -409,16 +452,24 @@ where
     [(); G::PLAYERS]:,
     [(); G::TRICKS]:,
 {
-    pub fn current_trick(&self) -> Option<OngoingTrick<G>> {
-        self.current_trick
+    /// Returns the current trick of this [`OngoingHand<G>`].
+    pub fn current_trick(&self) -> &Option<OngoingTrick<G>> {
+        &self.current_trick
     }
 
+    /// Returns a reference to the tricks of this [`OngoingHand<G>`].
     pub fn tricks(&self) -> &[Option<Trick<G>>; G::TRICKS] {
         &self.tricks
     }
 
+    /// Returns the index of this [`OngoingHand<G>`].
     pub fn index(&self) -> usize {
         self.index
+    }
+
+    /// .
+    pub fn finish(self) -> Hand<G> {
+        todo!()
     }
 
     /// Constructor for `OngoingHand`. All the internal fields are initialized
@@ -431,11 +482,12 @@ where
     /// let ongoing_hand = OngoingHand::<TressetteGame>::new();
     ///
     /// assert_eq!(ongoing_hand.index(), 0);
-    /// assert_eq!(ongoing_hand.current_trick(), None);
-    /// ongoing_hand.tricks().iter().for_each(|&t| assert_eq!(t, None));
+    /// assert!(ongoing_hand.current_trick().is_none());
+    /// ongoing_hand.tricks().iter().for_each(|t| assert!(t.is_none()));
     /// ```
     pub fn new() -> Self {
-        let tricks = [None; G::TRICKS];
+        let tricks: [Option<Trick<G>>; G::TRICKS] = array_init::array_init(|_| None);
+
         let current_trick = None;
         let index = 0;
 
@@ -487,7 +539,7 @@ where
 
         // self.current_trick = Some(OngoingTrick::new());
 
-        self.current_trick
+        None
     }
 }
 
@@ -549,6 +601,14 @@ mod tests {
         }
     }
 
+    impl Iterator for TestGame {
+        type Item = usize;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            todo!()
+        }
+    }
+
     /// Strategy to create an `OngoingTrick` filled with random cards. Since
     /// the `OngoingTrick` already contains the cards, `first_to_play` is
     /// irrelevant. Change this function accordingly if you need those to have
@@ -564,6 +624,8 @@ mod tests {
             OngoingTrick {
                 cards,
                 first_to_play: PlayerId(0),
+                next_to_play: PlayerId(0),
+                play_count: 0,
             }
         })
     }
@@ -573,11 +635,9 @@ mod tests {
         fn play_method_works(cards in array::uniform4(italian_card_strategy())) {
             let mut trick: OngoingTrick<TestGame> = OngoingTrick::new(PlayerId::new(0).unwrap());
 
-            // `catch_unwind()` will return `Ok` if the closure does not panic,
-            // it will return `Err` if it panics.
             for (index, &card) in cards.iter().enumerate() {
                 // Panicking if there are duplicates in the cards array.
-                trick.play(card, PlayerId::new(index).unwrap());
+                trick.play(card);
                 // If the card was successfully played, it will be contained
                 // inside the `OngoingTrick` struct as `Some`.
                 assert_eq!(trick[index], Some(card));
@@ -588,11 +648,10 @@ mod tests {
         fn finish_method_works(ongoing_trick in ongoing_trick_strategy()) {
             let trick = ongoing_trick.finish().unwrap();
 
-            let cards: Option<Vec<<TestGame as TrickTakingGame>::CardType>> = ongoing_trick.into_iter().collect();
-            let cards = cards.unwrap();
+            let cards = ongoing_trick.cards();
 
             prop_assert_eq!(trick.taker(), PlayerId::new(0).unwrap());
-            prop_assert_eq!(trick.taken_with(), cards[0]);
+            prop_assert_eq!(trick.taken_with(), cards[0].unwrap());
         }
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    fmt::Display,
+    fmt::{Debug, Display},
     ops::{Deref, DerefMut},
 };
 
@@ -7,7 +7,7 @@ use rand::Rng;
 use strum::{EnumIter, FromRepr, IntoEnumIterator};
 
 /// A trait representing a card. The actual implementation depends on the game where this is used.
-pub trait Card: Display + Default + Sized {}
+pub trait Card: Display + Default + Sized + Debug + Copy {}
 
 /// Representation of a card that goes into an Italian deck.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

@@ -2,13 +2,19 @@ use std::{fmt::Display, ops::Deref};
 
 use crate::common::{
     cards::{Card, ItalianCard, ItalianRank, Suit},
-    hands::{PlayerId, TrickTakingGame},
+    hands::{Hand, OngoingHand, PlayerId, TrickTakingGame},
 };
 use num_rational::Rational32;
 use std::cmp::Ordering;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct TressetteGame {}
+#[derive(Clone, Debug)]
+/// Contains the rules of the tressette game.
+pub struct TressetteGame {
+    hands: Vec<Hand<TressetteGame>>,
+    current_hand: OngoingHand<TressetteGame>,
+    team1_score: u8,
+    team2_score: u8,
+}
 
 impl TrickTakingGame for TressetteGame {
     type CardType = TressetteCard;
@@ -45,6 +51,7 @@ impl TrickTakingGame for TressetteGame {
     /// let taker = TressetteGame::determine_taker(&cards, PlayerId::new(2).unwrap());
     /// assert_eq!(taker, PlayerId::new(2).unwrap());
     /// ```
+    #[allow(clippy::expect_used)]
     fn determine_taker(
         cards: &[TressetteCard; Self::PLAYERS],
         first_to_play: PlayerId<{ Self::PLAYERS }>,
@@ -61,9 +68,37 @@ impl TrickTakingGame for TressetteGame {
     }
 }
 
+impl Iterator for TressetteGame {
+    type Item = OngoingHand<Self>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if a_team_won() {
+            None
+        } else {
+            Some(OngoingHand::new())
+        }
+    }
+}
+
+fn a_team_won() -> bool {
+    todo!()
+}
+
 impl TressetteGame {
+    /// Creates a new `TressetteGame`.
     pub fn new() -> Self {
-        TressetteGame {}
+        TressetteGame {
+            hands: Vec::new(),
+            current_hand: OngoingHand::new(),
+            team1_score: 0,
+            team2_score: 0,
+        }
+    }
+}
+
+impl Default for TressetteGame {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -159,6 +194,16 @@ impl TressetteCard {
 
     /// Generates a new `TressetteCard` starting from an `ItalianRank` and
     /// a `Suit`.
+    ///
+    /// # Examples.
+    /// ```
+    /// use shuftlib::common::cards::{ItalianCard, ItalianRank, Suit};
+    /// use shuftlib::tressette::TressetteCard;
+    ///
+    /// let suit = Suit::Spades;
+    /// let rank = ItalianRank::Ace;
+    /// assert_eq!(*TressetteCard::new(rank, suit), ItalianCard::new(rank,suit));
+    /// ```
     pub fn new(rank: ItalianRank, suit: Suit) -> Self {
         let card = ItalianCard::new(rank, suit);
 
