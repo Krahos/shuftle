@@ -7,7 +7,7 @@ use super::cards::Card;
 /// Many of the types contained in  this module are generic over certain
 /// constants related to the game. This trait is the summary of these
 /// constraints.
-pub trait TrickTakingGame: Iterator {
+pub trait TrickTakingGame {
     /// Define the type of card that's going to be used in this game.
     type CardType: Card;
     /// Every game has a fixed number of players defined by the rules of the
@@ -29,7 +29,7 @@ pub trait TrickTakingGame: Iterator {
 
 /// Represents a player of a game. This type is generic over the type of the
 /// card used for the specific game and over the number of players of such game.
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Debug)]
 pub struct Player<G>
 where
     G: TrickTakingGame,
@@ -52,10 +52,10 @@ where
     /// ```
     /// use shuftlib::common::hands::{Player, TrickTakingGame, PlayerId};
     /// use shuftlib::common::cards::{ItalianRank, Suit};
-    /// use shuftlib::tressette::{TressetteGame, TressetteCard};
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
     ///
-    /// let player_id = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
-    /// let mut player = Player::<TressetteGame>::new(player_id);
+    /// let player_id = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
+    /// let mut player = Player::<TressetteRules>::new(player_id);
     /// // Players have no cards when created.
     /// assert_eq!(player.hand().len(), 0);
     ///
@@ -65,6 +65,30 @@ where
     /// ```
     pub fn give(&mut self, card: G::CardType) {
         self.hand.push(card);
+    }
+
+    /// Removes a card from the hand of the player.
+    ///
+    /// # Examples
+    /// ```
+    /// use shuftlib::common::hands::{Player, TrickTakingGame, PlayerId};
+    /// use shuftlib::common::cards::{ItalianRank, Suit};
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
+    ///
+    /// let player_id = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
+    /// let mut player = Player::<TressetteRules>::new(player_id);
+    /// // Players have no cards when created.
+    /// assert_eq!(player.hand().len(), 0);
+    ///
+    /// let card = TressetteCard::new(ItalianRank::Ace, Suit::Spades);
+    /// player.give(card);
+    /// assert_eq!(player.hand().len(), 1);
+    ///
+    /// player.remove(card);
+    /// assert_eq!(player.hand().len(), 0);
+    /// ```
+    pub fn remove(&mut self, card: G::CardType) {
+        self.hand.retain(|&c| c != card);
     }
 
     /// Getter for the cards held by this player.
@@ -83,10 +107,10 @@ where
     /// # Examples.
     ///
     /// ```
-    /// use shuftlib::{common::hands::{Player, PlayerId, TrickTakingGame}, tressette::TressetteGame};
+    /// use shuftlib::{common::hands::{Player, PlayerId, TrickTakingGame}, tressette::TressetteRules};
     ///
-    /// let id = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
-    /// let player = Player::<TressetteGame>::new(id);
+    /// let id = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
+    /// let player = Player::<TressetteRules>::new(id);
     ///
     /// assert_eq!(*player.id(), 0);
     /// assert_eq!(player.hand().len(), 0);
@@ -240,22 +264,6 @@ where
     play_count: usize,
 }
 
-impl<G> Iterator for OngoingTrick<G>
-where
-    G: TrickTakingGame,
-    [(); G::PLAYERS]:,
-{
-    type Item = PlayerId<{ G::PLAYERS }>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.play_count == G::PLAYERS - 1 {
-            None
-        } else {
-            Some(self.next_to_play)
-        }
-    }
-}
-
 impl<G> Deref for OngoingTrick<G>
 where
     G: TrickTakingGame,
@@ -281,18 +289,22 @@ where
     /// ```
     /// #![feature(generic_const_exprs)]
     /// use shuftlib::common::{hands::{OngoingTrick, PlayerId, TrickTakingGame}, cards::{Card, ItalianRank, Suit}};
-    /// use shuftlib::tressette::{TressetteGame, TressetteCard};
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
     ///
-    /// let first_to_play = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
+    /// let first_to_play = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
     /// let card = TressetteCard::new(ItalianRank::Ace, Suit::Hearts);
-    /// let mut trick = OngoingTrick::<TressetteGame>::new(first_to_play);
+    /// let mut trick = OngoingTrick::<TressetteRules>::new(first_to_play);
     /// trick.play(card);
+    /// let mut second_to_play = first_to_play;
+    /// second_to_play.inc();
     ///
     /// assert_eq!(trick[0], Some(card));
+    /// assert_eq!(trick.next_to_play(), second_to_play)
     /// ```
     pub fn play(&mut self, card: G::CardType) {
         self.cards[self.next_to_play.0] = Some(card);
         self.next_to_play.inc();
+        self.play_count += 1;
     }
 
     /// Tries to transform the current `OngoingTrick` into a `Trick` by
@@ -311,7 +323,7 @@ where
     /// ```
     /// #![feature(generic_const_exprs)]
     /// use shuftlib::common::{hands::{OngoingTrick, PlayerId, TrickTakingGame}, cards::{ItalianRank, Suit}};
-    /// use shuftlib::tressette::{TressetteGame, TressetteCard};
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
     ///
     /// let cards = [
     ///   TressetteCard::new(ItalianRank::Ace, Suit::Hearts),
@@ -319,8 +331,8 @@ where
     ///   TressetteCard::new(ItalianRank::Three, Suit::Hearts),
     ///   TressetteCard::new(ItalianRank::Four, Suit::Hearts),
     /// ];
-    /// let first_to_play = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
-    /// let mut ongoing_trick = OngoingTrick::<TressetteGame>::new(first_to_play);
+    /// let first_to_play = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
+    /// let mut ongoing_trick = OngoingTrick::<TressetteRules>::new(first_to_play);
     /// ongoing_trick.play(cards[0]);
     ///
     /// // After only playing a card, it's not possible to finish the OngoingTrick.
@@ -337,7 +349,7 @@ where
     /// let trick = ongoing_trick.finish().unwrap();
     /// // Finishing the trick also means determining a taker. Since in this
     /// // example we are using the tressette game rules, player 2 is the taker.
-    /// assert_eq!(Some(trick.taker()), PlayerId::<{TressetteGame::PLAYERS}>::new(2));
+    /// assert_eq!(Some(trick.taker()), PlayerId::<{TressetteRules::PLAYERS}>::new(2));
     /// ```
     pub fn finish(self) -> Option<Trick<G>> {
         let mut cards: [G::CardType; G::PLAYERS] = [G::CardType::default(); G::PLAYERS];
@@ -367,13 +379,13 @@ where
     }
 
     /// Getter for the id of the person who starts the trick.
-    pub fn first_to_play(&self) -> usize {
-        self.first_to_play.0
+    pub fn first_to_play(&self) -> PlayerId<{ G::PLAYERS }> {
+        self.first_to_play
     }
 
     /// Getter for the id of the person who playes last in the trick.
-    pub fn next_to_play(&self) -> usize {
-        self.next_to_play.0
+    pub fn next_to_play(&self) -> PlayerId<{ G::PLAYERS }> {
+        self.next_to_play
     }
 
     /// Creates a new `OngoingTrick`, by defining the logic to determine the
@@ -383,19 +395,17 @@ where
     ///
     /// ```
     /// use shuftlib::common::hands::{OngoingTrick, PlayerId, TrickTakingGame};
-    /// use shuftlib::tressette::TressetteGame;
+    /// use shuftlib::tressette::TressetteRules;
     ///
-    /// let first_to_play = PlayerId::<{TressetteGame::PLAYERS}>::new(0).unwrap();
-    /// let ongoing_trick = OngoingTrick::<TressetteGame>::new(first_to_play);
+    /// let first_to_play = PlayerId::<{TressetteRules::PLAYERS}>::new(0).unwrap();
+    /// let ongoing_trick = OngoingTrick::<TressetteRules>::new(first_to_play);
     ///
-    /// assert_eq!(ongoing_trick.first_to_play(), 0);
+    /// assert_eq!(ongoing_trick.first_to_play(), first_to_play);
     /// ongoing_trick.cards().iter().for_each(|&c| assert!(c.is_none()));
     /// ```
     pub fn new(first_to_play: PlayerId<{ G::PLAYERS }>) -> Self {
         let mut last_to_play = first_to_play;
-        (0..G::PLAYERS - 1)
-            .into_iter()
-            .for_each(|_| last_to_play.inc());
+        (0..G::PLAYERS - 1).for_each(|_| last_to_play.inc());
         Self {
             cards: [None; G::PLAYERS],
             first_to_play,
@@ -467,19 +477,32 @@ where
         self.index
     }
 
-    /// .
-    pub fn finish(self) -> Hand<G> {
-        todo!()
+    /// Transforms an `OngoingHand` into a `Hand`, a read-only data structure
+    /// used to just story the information related to a hand that has been played.
+    pub fn finish(self) -> Option<Hand<G>> {
+        if self.tricks.iter().any(|t| t.is_none()) {
+            return None;
+        }
+
+        let tricks: [Trick<G>; G::TRICKS] = self
+            .tricks
+            .into_iter()
+            .filter_map(|t| t)
+            .collect::<Vec<_>>()
+            .try_into()
+            .ok()?;
+        Some(Hand { tricks })
     }
 
     /// Constructor for `OngoingHand`. All the internal fields are initialized
     /// as empty or None.
     ///
     /// # Examples
-    /// ```
-    /// use shuftlib::{common::{hands::OngoingHand}, tressette::TressetteGame};
     ///
-    /// let ongoing_hand = OngoingHand::<TressetteGame>::new();
+    /// ```
+    /// use shuftlib::{common::{hands::OngoingHand}, tressette::TressetteRules};
+    ///
+    /// let ongoing_hand = OngoingHand::<TressetteRules>::new();
     ///
     /// assert_eq!(ongoing_hand.index(), 0);
     /// assert!(ongoing_hand.current_trick().is_none());
@@ -510,39 +533,6 @@ where
     }
 }
 
-impl<G> Iterator for OngoingHand<G>
-where
-    G: TrickTakingGame,
-    [(); G::PLAYERS]:,
-    [(); G::TRICKS]:,
-{
-    type Item = OngoingTrick<G>;
-
-    /// Returns the next `OngoingTrick` of the hand that's currently being
-    /// played (`OngoingHand`).
-    ///
-    /// # Panics
-    ///
-    /// The `OngoingTrick` returned **must** be completed before calling next.
-    /// Calling next without first completing the `OngoingTrick` will panic.
-    ///
-    /// # Examples
-    ///
-    /// use shuftlib::tressette::OngoingHand;
-    ///
-    /// let ongoing_hand = OngoingHand::new();
-    fn next(&mut self) -> Option<Self::Item> {
-        // if let Some(ongoing_trick) = self.current_trick {
-        //     self.tricks[self.index] = Some(ongoing_trick.finish().unwrap());
-        //     self.index += 1;
-        // }
-
-        // self.current_trick = Some(OngoingTrick::new());
-
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use proptest::collection::hash_set;
@@ -552,35 +542,29 @@ mod tests {
 
     use super::{OngoingTrick, PlayerId, TrickTakingGame};
 
-    /// Strategy to create a random `ItalianRank`.
-    fn rank_strategy() -> impl Strategy<Value = ItalianRank> {
-        prop_oneof![
-            Just(ItalianRank::Ace),
-            Just(ItalianRank::Two),
-            Just(ItalianRank::Three),
-            Just(ItalianRank::Four),
-            Just(ItalianRank::Five),
-            Just(ItalianRank::Six),
-            Just(ItalianRank::Seven),
-            Just(ItalianRank::Jack),
-            Just(ItalianRank::Knight),
-            Just(ItalianRank::King),
-        ]
-    }
-
-    /// Strategy to create a random `Suit`.
-    fn suit_strategy() -> impl Strategy<Value = Suit> {
-        prop_oneof![
-            Just(Suit::Hearts),
-            Just(Suit::Clubs),
-            Just(Suit::Spades),
-            Just(Suit::Diamonds),
-        ]
-    }
-
     /// Strategy to create a random `TressetteCard`.
     fn italian_card_strategy() -> impl Strategy<Value = ItalianCard> {
-        (rank_strategy(), suit_strategy()).prop_map(|(rank, suit)| ItalianCard::new(rank, suit))
+        (
+            prop_oneof![
+                Just(ItalianRank::Ace),
+                Just(ItalianRank::Two),
+                Just(ItalianRank::Three),
+                Just(ItalianRank::Four),
+                Just(ItalianRank::Five),
+                Just(ItalianRank::Six),
+                Just(ItalianRank::Seven),
+                Just(ItalianRank::Jack),
+                Just(ItalianRank::Knight),
+                Just(ItalianRank::King),
+            ],
+            prop_oneof![
+                Just(Suit::Hearts),
+                Just(Suit::Clubs),
+                Just(Suit::Spades),
+                Just(Suit::Diamonds),
+            ],
+        )
+            .prop_map(|(rank, suit)| ItalianCard::new(rank, suit))
     }
 
     #[derive(Clone, Copy, Debug)]
@@ -598,14 +582,6 @@ mod tests {
             _first_to_play: super::PlayerId<{ Self::PLAYERS }>,
         ) -> super::PlayerId<{ Self::PLAYERS }> {
             PlayerId::new(0).unwrap()
-        }
-    }
-
-    impl Iterator for TestGame {
-        type Item = usize;
-
-        fn next(&mut self) -> Option<Self::Item> {
-            todo!()
         }
     }
 

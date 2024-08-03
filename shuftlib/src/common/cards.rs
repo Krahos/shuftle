@@ -7,7 +7,7 @@ use rand::Rng;
 use strum::{EnumIter, FromRepr, IntoEnumIterator};
 
 /// A trait representing a card. The actual implementation depends on the game where this is used.
-pub trait Card: Display + Default + Sized + Debug + Copy {}
+pub trait Card: Display + Default + Sized + Debug + Copy + Eq + PartialEq {}
 
 /// Representation of a card that goes into an Italian deck.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -92,16 +92,10 @@ impl Display for FrenchCard {
 impl Card for FrenchCard {}
 
 /// A Joker card, present in some card games. Its function depends on the game.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct Joker;
 
 impl Card for Joker {}
-
-impl Default for Joker {
-    fn default() -> Self {
-        Self {}
-    }
-}
 
 impl Display for Joker {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

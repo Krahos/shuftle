@@ -2,25 +2,19 @@ use std::{fmt::Display, ops::Deref};
 
 use crate::common::{
     cards::{Card, ItalianCard, ItalianRank, Suit},
-    hands::{Hand, OngoingHand, PlayerId, TrickTakingGame},
+    hands::{Hand, OngoingHand, OngoingTrick, Player, PlayerId, TrickTakingGame},
 };
 use num_rational::Rational32;
 use std::cmp::Ordering;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 /// Contains the rules of the tressette game.
-pub struct TressetteGame {
-    hands: Vec<Hand<TressetteGame>>,
-    current_hand: OngoingHand<TressetteGame>,
-    team1_score: u8,
-    team2_score: u8,
-}
+pub struct TressetteRules {}
 
-impl TrickTakingGame for TressetteGame {
+impl TrickTakingGame for TressetteRules {
     type CardType = TressetteCard;
 
     const PLAYERS: usize = 4;
-
     const TRICKS: usize = 10;
 
     /// Contains the logic to determine who won the trick in a standard
@@ -29,7 +23,9 @@ impl TrickTakingGame for TressetteGame {
     /// played that trick. See the implementation of `Ord` and `PartialOrd` for
     /// `TressetteCard` for more info. The implementation of this trait is meant
     /// to only be used internally by `OngoingTrick`, however it's possible to
-    /// call it elsewhere if needed.
+    /// call it elsewhere if needed. It also assumes the slice `cards` is valid
+    /// for the tressette game, so it assumes there are no duplicates. It's a
+    /// responsability of the caller to make sure that's the case.
     ///
     /// # Panics
     ///
@@ -39,7 +35,7 @@ impl TrickTakingGame for TressetteGame {
     ///
     /// ```
     /// use shuftlib::common::{hands::{TrickTakingGame, PlayerId}, cards::{ItalianRank, Suit}};
-    /// use shuftlib::tressette::{TressetteGame, TressetteCard};
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
     ///
     /// let cards = [
     ///   TressetteCard::new(ItalianRank::Ace, Suit::Hearts),
@@ -48,7 +44,7 @@ impl TrickTakingGame for TressetteGame {
     ///   TressetteCard::new(ItalianRank::Four, Suit::Hearts),
     /// ];
     ///
-    /// let taker = TressetteGame::determine_taker(&cards, PlayerId::new(2).unwrap());
+    /// let taker = TressetteRules::determine_taker(&cards, PlayerId::new(2).unwrap());
     /// assert_eq!(taker, PlayerId::new(2).unwrap());
     /// ```
     #[allow(clippy::expect_used)]
@@ -68,37 +64,59 @@ impl TrickTakingGame for TressetteGame {
     }
 }
 
-impl Iterator for TressetteGame {
-    type Item = OngoingHand<Self>;
+/// The score a team has to reach to win a game of tressette.
+pub const SCORE_TO_WIN: u8 = 31;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        if a_team_won() {
-            None
-        } else {
-            Some(OngoingHand::new())
-        }
+impl TressetteRules {
+    /// Determines if a team won the game. A team wins the game when its score is
+    /// greater than 31 and has a higher score than the other team.
+    pub fn is_completed(score: (u8, u8)) -> bool {
+        (score.0 >= SCORE_TO_WIN && score.0 > score.1)
+            || (score.1 >= SCORE_TO_WIN && score.1 > score.0)
     }
-}
 
-fn a_team_won() -> bool {
-    todo!()
-}
-
-impl TressetteGame {
-    /// Creates a new `TressetteGame`.
-    pub fn new() -> Self {
-        TressetteGame {
-            hands: Vec::new(),
-            current_hand: OngoingHand::new(),
-            team1_score: 0,
-            team2_score: 0,
+    /// Returns a view of the playable cards held by a player, based on the suit
+    /// of a card that has been played before and by the rules of tressette. If
+    /// the player is the first to play, the leading suit can be None.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use shuftlib::tressette::{TressetteRules, TressetteCard};
+    /// use shuftlib::common::hands::Player;
+    /// use shuftlib::common::cards::{Suit, ItalianRank};
+    ///
+    /// let mut player = Player::default();
+    /// player.give(TressetteCard::new(ItalianRank::Ace, Suit::Spades));
+    /// player.give(TressetteCard::new(ItalianRank::Two, Suit::Spades));
+    /// player.give(TressetteCard::new(ItalianRank::Ace, Suit::Hearts));
+    ///
+    /// assert_eq![TressetteRules::playable(&player, Some(Suit::Spades)).len(), 2];
+    /// assert_eq![TressetteRules::playable(&player, Some(Suit::Clubs)).len(), 3];
+    /// ```
+    pub fn playable(
+        player: &Player<TressetteRules>,
+        leading_suit: Option<Suit>,
+    ) -> Vec<TressetteCard> {
+        if let Some(leading_suit) = leading_suit {
+            if player.hand().iter().any(|c| c.suit() == leading_suit) {
+                return player
+                    .hand()
+                    .iter()
+                    .filter(|c| c.suit() == leading_suit)
+                    .cloned()
+                    .collect();
+            }
         }
-    }
-}
 
-impl Default for TressetteGame {
-    fn default() -> Self {
-        Self::new()
+        player.hand().into()
+    }
+
+    pub fn play(
+        player: &mut Player<TressetteRules>,
+        card: TressetteCard,
+        ongoing_trick: &mut OngoingTrick<TressetteRules>,
+    ) {
     }
 }
 
@@ -208,5 +226,110 @@ impl TressetteCard {
         let card = ItalianCard::new(rank, suit);
 
         TressetteCard { card }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        common::{
+            cards::{ItalianRank, Suit},
+            hands::{Player, PlayerId, TrickTakingGame},
+        },
+        tressette::SCORE_TO_WIN,
+    };
+    use prop::collection::hash_set;
+    use proptest::prelude::*;
+
+    use super::{TressetteCard, TressetteRules};
+
+    fn tressette_card_strategy() -> impl Strategy<Value = TressetteCard> {
+        (
+            prop_oneof![
+                Just(ItalianRank::Ace),
+                Just(ItalianRank::Two),
+                Just(ItalianRank::Three),
+                Just(ItalianRank::Four),
+                Just(ItalianRank::Five),
+                Just(ItalianRank::Six),
+                Just(ItalianRank::Seven),
+                Just(ItalianRank::Jack),
+                Just(ItalianRank::Knight),
+                Just(ItalianRank::King),
+            ],
+            prop_oneof![
+                Just(Suit::Hearts),
+                Just(Suit::Clubs),
+                Just(Suit::Spades),
+                Just(Suit::Diamonds),
+            ],
+        )
+            .prop_map(|(rank, suit)| TressetteCard::new(rank, suit))
+    }
+
+    fn player_strategy() -> impl Strategy<Value = Player<TressetteRules>> {
+        (
+            0..TressetteRules::PLAYERS,
+            hash_set(tressette_card_strategy(), 1..TressetteRules::TRICKS),
+        )
+            .prop_map(|(index, cards)| {
+                let mut player = Player::new(PlayerId::new(index).unwrap());
+                for card in cards {
+                    player.give(card);
+                }
+                player
+            })
+    }
+
+    proptest! {
+        #[test]
+        fn a_team_won_with_both_below(team1_score in 0u8..SCORE_TO_WIN, team2_score in 0u8..SCORE_TO_WIN) {
+            let result = TressetteRules::is_completed((team1_score, team2_score));
+            assert_eq!(result, false);
+        }
+
+        #[test]
+        fn a_team_won_with_both_above_and_same(score in SCORE_TO_WIN..u8::MAX) {
+            let result = TressetteRules::is_completed((score, score));
+            assert_eq!(result, false);
+        }
+
+        #[test]
+        fn a_team_won_with_both_above_and_different(score in SCORE_TO_WIN..u8::MAX) {
+            let result = TressetteRules::is_completed((score, score+1));
+            assert_eq!(result, true);
+        }
+
+        #[test]
+        fn a_team_won_with_team1_above(team1_score in 0u8..SCORE_TO_WIN, team2_score in SCORE_TO_WIN..u8::MAX) {
+            let result = TressetteRules::is_completed((team1_score, team2_score));
+            assert_eq!(result, true);
+        }
+
+        #[test]
+        fn a_team_won_with_team2_above(team1_score in SCORE_TO_WIN..u8::MAX, team2_score in 0u8..SCORE_TO_WIN ) {
+            let result = TressetteRules::is_completed((team1_score, team2_score));
+            assert_eq!(result, true);
+        }
+
+        #[test]
+        fn playable_works(player in player_strategy(), suit in prop_oneof![Just(Suit::Hearts), Just(Suit::Spades), Just(Suit::Clubs), Just(Suit::Diamonds)]) {
+            let playable = TressetteRules::playable(&player, None);
+
+            // When the player is the first to go, he can play whatever he wants.
+            prop_assert_eq!(playable.len(), player.hand().len());
+
+            let playable = TressetteRules::playable(&player, Some(suit));
+            let same_suit_cards = player.hand().iter().filter(|c| c.suit() == suit).count();
+
+            // When the player is not the first, if he doesn't have cards of the
+            // same suit as the first, he can play whatever he wants, otherwise
+            // he can only play cards of the same suit.
+            if same_suit_cards == 0 {
+                prop_assert_eq!(playable.len(), player.hand().len());
+            } else {
+                prop_assert_eq!(playable.len(), same_suit_cards);
+            }
+        }
     }
 }
