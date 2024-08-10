@@ -2,9 +2,9 @@ use std::{fmt::Display, ops::Deref};
 
 use crate::common::{
     cards::{Card, ItalianCard, ItalianRank, Suit},
-    hands::{Hand, OngoingHand, OngoingTrick, Player, PlayerId, TrickTakingGame},
+    hands::{Hand, OngoingTrick, Player, PlayerId, TrickTakingGame},
 };
-use num_rational::Rational32;
+use num_rational::{Ratio, Rational32};
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug, Default)]
@@ -112,11 +112,28 @@ impl TressetteRules {
         player.hand().into()
     }
 
+    /// Plays the specified card for the player
     pub fn play(
         player: &mut Player<TressetteRules>,
         card: TressetteCard,
         ongoing_trick: &mut OngoingTrick<TressetteRules>,
     ) {
+        player.remove(card);
+        ongoing_trick.play(card);
+    }
+
+    pub fn compute_score(hand: &Hand<Self>, score: &mut (u8, u8)) {
+        let mut tmp_score = (Rational32::new(0, 3), Rational32::new(0, 3));
+        for trick in hand.tricks() {
+            if *trick.taker() == 0 || *trick.taker() == 2 {
+                tmp_score.0 += trick.cards().iter().map(|c| c.value()).sum::<Rational32>();
+            } else {
+                tmp_score.1 += trick.cards().iter().map(|c| c.value()).sum::<Rational32>();
+            }
+        }
+
+        score.0 += tmp_score.0.to_integer() as u8;
+        score.1 += tmp_score.1.to_integer() as u8;
     }
 }
 
@@ -285,31 +302,31 @@ mod tests {
         #[test]
         fn a_team_won_with_both_below(team1_score in 0u8..SCORE_TO_WIN, team2_score in 0u8..SCORE_TO_WIN) {
             let result = TressetteRules::is_completed((team1_score, team2_score));
-            assert_eq!(result, false);
+            assert!(!result);
         }
 
         #[test]
         fn a_team_won_with_both_above_and_same(score in SCORE_TO_WIN..u8::MAX) {
             let result = TressetteRules::is_completed((score, score));
-            assert_eq!(result, false);
+            assert!(!result);
         }
 
         #[test]
         fn a_team_won_with_both_above_and_different(score in SCORE_TO_WIN..u8::MAX) {
             let result = TressetteRules::is_completed((score, score+1));
-            assert_eq!(result, true);
+            assert!(result);
         }
 
         #[test]
         fn a_team_won_with_team1_above(team1_score in 0u8..SCORE_TO_WIN, team2_score in SCORE_TO_WIN..u8::MAX) {
             let result = TressetteRules::is_completed((team1_score, team2_score));
-            assert_eq!(result, true);
+            assert!(result);
         }
 
         #[test]
         fn a_team_won_with_team2_above(team1_score in SCORE_TO_WIN..u8::MAX, team2_score in 0u8..SCORE_TO_WIN ) {
             let result = TressetteRules::is_completed((team1_score, team2_score));
-            assert_eq!(result, true);
+            assert!(result);
         }
 
         #[test]

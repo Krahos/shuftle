@@ -248,6 +248,11 @@ where
     pub fn taker(&self) -> PlayerId<{ G::PLAYERS }> {
         self.taker
     }
+
+    /// Getter for the cards played during this trick.
+    pub fn cards(&self) -> &[G::CardType] {
+        &self.cards
+    }
 }
 
 /// A temporary state of a trick that's still not over: not all the players made
@@ -487,7 +492,7 @@ where
         let tricks: [Trick<G>; G::TRICKS] = self
             .tricks
             .into_iter()
-            .filter_map(|t| t)
+            .flatten()
             .collect::<Vec<_>>()
             .try_into()
             .ok()?;
@@ -519,6 +524,11 @@ where
             current_trick,
             index,
         }
+    }
+
+    /// Adds a trick to this hand.
+    pub fn add(&mut self, trick: Trick<G>, id: usize) {
+        self.tricks[id] = Some(trick);
     }
 }
 
