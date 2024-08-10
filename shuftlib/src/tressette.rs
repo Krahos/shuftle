@@ -4,7 +4,7 @@ use crate::common::{
     cards::{Card, ItalianCard, ItalianRank, Suit},
     hands::{Hand, OngoingTrick, Player, PlayerId, TrickTakingGame},
 };
-use num_rational::{Ratio, Rational32};
+use num_rational::Rational32;
 use std::cmp::Ordering;
 
 #[derive(Clone, Debug, Default)]
@@ -122,18 +122,30 @@ impl TressetteRules {
         ongoing_trick.play(card);
     }
 
+    /// Computes the score for a hand of the tressette game.
+    /// Score is always a maximum of 11 points.
     pub fn compute_score(hand: &Hand<Self>, score: &mut (u8, u8)) {
         let mut tmp_score = (Rational32::new(0, 3), Rational32::new(0, 3));
+
+        let mut taker = 0;
         for trick in hand.tricks() {
             if *trick.taker() == 0 || *trick.taker() == 2 {
                 tmp_score.0 += trick.cards().iter().map(|c| c.value()).sum::<Rational32>();
             } else {
                 tmp_score.1 += trick.cards().iter().map(|c| c.value()).sum::<Rational32>();
             }
+
+            taker = *trick.taker();
         }
 
         score.0 += tmp_score.0.to_integer() as u8;
         score.1 += tmp_score.1.to_integer() as u8;
+
+        if taker == 0 || taker == 2 {
+            score.0 += 1;
+        } else {
+            score.1 += 1;
+        }
     }
 }
 

@@ -49,12 +49,6 @@ fn tressette_works() {
         }
         let hand = ongoing_hand.finish().unwrap();
         TressetteRules::compute_score(&hand, &mut score);
-        let taker = hand.tricks().last().unwrap().taker();
-        if *taker == 0 || *taker == 2 {
-            score.0 += 1;
-        } else {
-            score.1 += 1;
-        }
         hands.push(hand);
     }
 

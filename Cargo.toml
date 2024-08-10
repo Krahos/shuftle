@@ -27,3 +27,4 @@ missing_errors_doc = "warn"
 todo = "warn"
 cast_lossless = "warn"
 cognitive_complexity = "warn"
+
